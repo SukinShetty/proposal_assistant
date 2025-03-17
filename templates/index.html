@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proposal Assistant</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.5;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .upload-section, .chat-section {
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 5px;
+        }
+        .chat-messages {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #eee;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        .message {
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            line-height: 1.6;
+        }
+        .user-message {
+            background-color: #e3f2fd;
+            margin-left: 20px;
+        }
+        .bot-message {
+            background-color: #f5f5f5;
+            margin-right: 20px;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            border-radius: 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        #file-name {
+            margin-top: 10px;
+            font-style: italic;
+        }
+        .voice-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .voice-controls button {
+            background-color: #2196F3;
+        }
+        .voice-controls button:hover {
+            background-color: #1976D2;
+        }
+        .keywords-section {
+            margin-top: 15px;
+        }
+        .keyword-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .keyword-chip {
+            background-color: #e0e0e0;
+            padding: 5px 10px;
+            border-radius: 16px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .keyword-chip:hover {
+            background-color: #bdbdbd;
+        }
+        .hidden {
+            display: none;
+        }
+        .audio-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .audio-controls button {
+            background-color: #ff9800;
+        }
+        .audio-controls button:hover {
+            background-color: #f57c00;
+        }
+        #pauseResponse, #stopResponse {
+            background-color: #f44336;
+        }
+        #pauseResponse:hover, #stopResponse:hover {
+            background-color: #d32f2f;
+        }
+        #pauseResponse.paused {
+            background-color: #4CAF50;
+        }
+        #pauseResponse.paused:hover {
+            background-color: #45a049;
+        }
+        p {
+            margin: 10px 0;
+        }
+        .loader {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .loading-overlay.hidden {
+            display: none !important;
+        }
+        .loading-content {
+            text-align: center;
+            padding: 20px;
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .loading-content .loader {
+            width: 40px;
+            height: 40px;
+            border-width: 5px;
+            margin: 20px auto;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Proposal Assistant</h1>
+        
+        <!-- PDF Upload Section -->
+        <div class="upload-section" id="uploadSection">
+            <h2>Step 1: Upload Your PDF</h2>
+            <p>Please upload your proposal PDF file to begin:</p>
+            <input type="file" id="pdfFile" accept=".pdf" style="display: none;">
+            <button onclick="document.getElementById('pdfFile').click()">Choose PDF File</button>
+            <div id="file-name"></div>
+            <button id="uploadBtn" class="hidden">Upload and Process</button>
+        </div>
+
+        <!-- Chat Interface -->
+        <div class="chat-section hidden" id="chatSection">
+            <h2>Step 2: Ask Questions About Your Proposal</h2>
+            
+            <!-- Keywords Section -->
+            <div class="keywords-section">
+                <h3>Important Topics in Your Proposal:</h3>
+                <p>Click on any keyword to ask about it:</p>
+                <div class="keyword-chips" id="keywordChips"></div>
+            </div>
+            
+            <div class="chat-messages" id="chatMessages">
+                <div class="message bot-message">
+                    Hello! I've processed your proposal. What would you like to know about it?
+                </div>
+            </div>
+            
+            <div class="voice-controls">
+                <button id="startVoice">
+                    <span id="voiceButtonText">Start Voice Input</span>
+                </button>
+                <button id="stopVoice" class="hidden">Stop Voice Input</button>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <input type="text" id="userInput" placeholder="Type your question here..." 
+                       style="flex: 1; padding: 10px; font-size: 16px;">
+                <button id="sendMessage">Send</button>
+                <span id="sendingLoader" class="loader hidden"></span>
+            </div>
+            
+            <div class="audio-controls">
+                <button id="speakResponse">
+                    <span>Read Response Aloud</span>
+                </button>
+                <button id="pauseResponse">
+                    <span id="pauseButtonText">Pause</span>
+                </button>
+                <button id="stopResponse">
+                    <span>Stop</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay hidden">
+        <div class="loading-content">
+            <h3 id="loadingMessage">Processing...</h3>
+            <div class="loader"></div>
+            <p id="loadingDetails">This may take a moment</p>
+        </div>
+    </div>
+
+    <script>
+        // File upload handling
+        const pdfFile = document.getElementById('pdfFile');
+        const fileName = document.getElementById('file-name');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const uploadSection = document.getElementById('uploadSection');
+        const chatSection = document.getElementById('chatSection');
+        const keywordChips = document.getElementById('keywordChips');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingMessage = document.getElementById('loadingMessage');
+        const loadingDetails = document.getElementById('loadingDetails');
+        const sendingLoader = document.getElementById('sendingLoader');
+
+        // Ensure loading overlay is hidden on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadingOverlay.classList.add('hidden');
+        });
+
+        function showLoading(message, details) {
+            loadingMessage.textContent = message || 'Processing...';
+            loadingDetails.textContent = details || 'This may take a moment';
+            loadingOverlay.classList.remove('hidden');
+        }
+
+        function hideLoading() {
+            loadingOverlay.classList.add('hidden');
+        }
+
+        pdfFile.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                fileName.textContent = `Selected file: ${file.name}`;
+                uploadBtn.classList.remove('hidden');
+            }
+        });
+
+        uploadBtn.addEventListener('click', async () => {
+            const formData = new FormData();
+            formData.append('pdf', pdfFile.files[0]);
+
+            try {
+                showLoading('Processing PDF', 'Extracting text and analyzing content...');
+                uploadBtn.disabled = true;
+                
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Display keywords as chips
+                    if (data.keywords && data.keywords.length > 0) {
+                        keywordChips.innerHTML = '';
+                        data.keywords.forEach(keyword => {
+                            const chip = document.createElement('div');
+                            chip.className = 'keyword-chip';
+                            chip.textContent = keyword;
+                            chip.addEventListener('click', () => {
+                                userInput.value = `Tell me about ${keyword} in the proposal`;
+                                sendQuestion();
+                            });
+                            keywordChips.appendChild(chip);
+                        });
+                    }
+                    
+                    uploadSection.classList.add('hidden');
+                    chatSection.classList.remove('hidden');
+                } else {
+                    alert('Error uploading file. Please try again.');
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+                alert('Error uploading file. Please try again.');
+            } finally {
+                hideLoading();
+                uploadBtn.disabled = false;
+            }
+        });
+
+        // Chat and voice functionality
+        const startVoice = document.getElementById('startVoice');
+        const stopVoice = document.getElementById('stopVoice');
+        const voiceButtonText = document.getElementById('voiceButtonText');
+        const userInput = document.getElementById('userInput');
+        const sendMessage = document.getElementById('sendMessage');
+        const chatMessages = document.getElementById('chatMessages');
+        const speakResponse = document.getElementById('speakResponse');
+        const pauseResponse = document.getElementById('pauseResponse');
+        const stopResponse = document.getElementById('stopResponse');
+        const pauseButtonText = document.getElementById('pauseButtonText');
+
+        // Speech recognition setup
+        let recognition = null;
+        if ('webkitSpeechRecognition' in window) {
+            recognition = new webkitSpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+
+            recognition.onresult = (event) => {
+                const result = event.results[event.results.length - 1];
+                if (result.isFinal) {
+                    userInput.value = result[0].transcript;
+                }
+            };
+        }
+
+        startVoice.addEventListener('click', () => {
+            if (recognition) {
+                recognition.start();
+                startVoice.classList.add('hidden');
+                stopVoice.classList.remove('hidden');
+            } else {
+                alert('Voice recognition is not supported in your browser.');
+            }
+        });
+
+        stopVoice.addEventListener('click', () => {
+            if (recognition) {
+                recognition.stop();
+                stopVoice.classList.add('hidden');
+                startVoice.classList.remove('hidden');
+                // Auto-send the question after stopping voice input
+                if (userInput.value.trim()) {
+                    sendQuestion();
+                }
+            }
+        });
+
+        // Text-to-speech setup
+        let isPaused = false;
+        
+        const speak = (text) => {
+            if ('speechSynthesis' in window) {
+                // Cancel any ongoing speech
+                speechSynthesis.cancel();
+                
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.rate = 1.0;
+                utterance.pitch = 1.0;
+                
+                // Reset pause button state
+                isPaused = false;
+                pauseResponse.classList.remove('paused');
+                pauseButtonText.textContent = 'Pause';
+                
+                speechSynthesis.speak(utterance);
+            } else {
+                alert('Text-to-speech is not supported in your browser.');
+            }
+        };
+
+        speakResponse.addEventListener('click', () => {
+            // Get the last bot message
+            const messages = document.querySelectorAll('.bot-message');
+            if (messages.length > 0) {
+                const lastMessage = messages[messages.length - 1];
+                speak(lastMessage.textContent);
+            }
+        });
+        
+        pauseResponse.addEventListener('click', () => {
+            if ('speechSynthesis' in window) {
+                if (speechSynthesis.speaking) {
+                    if (isPaused) {
+                        // Resume speech
+                        speechSynthesis.resume();
+                        isPaused = false;
+                        pauseResponse.classList.remove('paused');
+                        pauseButtonText.textContent = 'Pause';
+                    } else {
+                        // Pause speech
+                        speechSynthesis.pause();
+                        isPaused = true;
+                        pauseResponse.classList.add('paused');
+                        pauseButtonText.textContent = 'Resume';
+                    }
+                }
+            }
+        });
+        
+        stopResponse.addEventListener('click', () => {
+            if ('speechSynthesis' in window) {
+                speechSynthesis.cancel();
+                isPaused = false;
+                pauseResponse.classList.remove('paused');
+                pauseButtonText.textContent = 'Pause';
+            }
+        });
+
+        function formatText(text) {
+            // Preserve line breaks in the text
+            return text.replace(/\n/g, '<br>');
+        }
+
+        function addMessage(message, isUser = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
+            
+            // Use innerHTML to preserve formatting
+            if (!isUser) {
+                messageDiv.innerHTML = formatText(message);
+            } else {
+                messageDiv.textContent = message;
+            }
+            
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        async function sendQuestion() {
+            const question = userInput.value.trim();
+            if (!question) return;
+
+            addMessage(question, true);
+            userInput.value = '';
+            
+            // Disable send button and show loader
+            sendMessage.disabled = true;
+            sendingLoader.classList.remove('hidden');
+
+            try {
+                const response = await fetch('/ask', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ question })
+                });
+
+                const data = await response.json();
+                addMessage(data.answer);
+                
+                // Automatically read the response aloud
+                speak(data.answer);
+            } catch (error) {
+                console.error('Error:', error);
+                addMessage('Sorry, there was an error processing your question. Please try again.');
+            } finally {
+                // Re-enable send button and hide loader
+                sendMessage.disabled = false;
+                sendingLoader.classList.add('hidden');
+            }
+        }
+
+        sendMessage.addEventListener('click', sendQuestion);
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendQuestion();
+            }
+        });
+    </script>
+</body>
+</html> 
